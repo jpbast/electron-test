@@ -1,12 +1,14 @@
 import dayjs from 'dayjs';
+import path from 'path';
 import { app, BrowserWindow, desktopCapturer, ipcMain, powerMonitor } from 'electron'
 import * as fs from 'fs';
-import { execFile } from 'child_process';
 
 let mainWindow: BrowserWindow | null
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string
+
+const BASE_PATH = process.env.NODE_ENV === 'production' ? __dirname : path.join(__dirname, '../..');
 
 function createWindow () {
   mainWindow = new BrowserWindow({
@@ -24,8 +26,6 @@ function createWindow () {
 
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY)
 
- 
-
   mainWindow.on('ready-to-show', () => {
     updateFoldersState();
     mainWindow.show();
@@ -42,8 +42,7 @@ const createFolder = (name: string) => {
 }
 
 const getFolders = () => {
-  const allFolders = fs.readdirSync(__dirname);
-
+  const allFolders = fs.readdirSync(BASE_PATH);
   return allFolders.filter((folder) => folder.includes('electron-')).map((folder) => {
     return {
       folderName: folder,
@@ -54,14 +53,11 @@ const getFolders = () => {
 
 const updateFoldersState = () => {
   const folders = getFolders();
+  console.log('folders', folders)
   mainWindow.webContents.send('folders', folders);
 }
 
 async function registerListeners () {
-  fs.appendFileSync('./electron-logs/test.txt', `App opened at ${dayjs().format('MMM DD - hh:mm A')}\n`)
-  
-  const teste = execFile('./out/electron/electron-starter.exe');
-  console.log('teste', teste)
   ipcMain.on('createFolder', (_, folderName) => {
     console.log('folderName', folderName)
 
@@ -73,7 +69,7 @@ async function registerListeners () {
 
     createFolder(info.folderName);
 
-    fs.writeFileSync(`./${info.folderName}/${info.fileName}`, "")
+    fs.writeFileSync(`${BASE_PATH}/${info.folderName}/${info.fileName}`, "")
     updateFoldersState();
   })
 
@@ -88,23 +84,14 @@ async function registerListeners () {
       mainWindow.webContents.send('thumbnailUrl', sources[0].thumbnail.toDataURL())
     })
   })
-  powerMonitor.addListener('on-battery', () => {
-    console.log('on battery');
-  })
-
-  powerMonitor.addListener('user-did-become-active', () => {
-    console.log('ligou');
-  })
 
 }
-
 app.on('ready', createWindow)
   .whenReady()
   .then(registerListeners)
   .catch(e => console.error(e))
 
 app.on('window-all-closed', () => {
-  fs.appendFileSync('./electron-logs/test.txt', `App closed at ${dayjs().format('MMM DD - hh:mm A')}\n`)
   if (process.platform !== 'darwin') {
     app.quit()
   }
